@@ -1,5 +1,7 @@
 extern crate rand;
 
+use std::collections::{HashSet, VecDeque};
+
 use macroquad::prelude::*;
 use macroquad::window::Conf;
 use rand::seq::index;
@@ -145,15 +147,84 @@ impl Board {
             || !(mouse_pos.1 <= self.tile_width * (row as f32 + 1.0) + self.gap * row as f32)
     }
 
+    fn neighbors(&self, row: usize, col: usize) -> Vec<(usize, usize)> {
+        let indices = [
+            (row as i32, col as i32 - 1),
+            (row as i32, col as i32 + 1),
+            (row as i32 - 1, col as i32),
+            (row as i32 + 1, col as i32),
+        ];
+
+        let state = &self.state;
+
+        let is_valid = |row: i32, col: i32| {
+            row >= 0
+                && col >= 0
+                && row < self.y_cells as i32
+                && col < self.x_cells as i32
+                && match state[row as usize][col as usize].cell_type {
+                    CellType::Mine => false,
+                    _ => true,
+                }
+        };
+
+        indices
+            .into_iter()
+            .filter(|(row, col)| is_valid(*row, *col))
+            .map(|(row, col)| (row as usize, col as usize))
+            .collect()
+    }
+
+    fn reveal_empty(&mut self, row: usize, col: usize) {
+        // Use BFS to reveal empty
+        let mut queue: VecDeque<(usize, usize)> = VecDeque::new();
+
+        queue.push_back((row, col));
+
+        let mut visited: HashSet<(usize, usize)> = HashSet::new();
+
+        while !queue.is_empty() {
+            let pos = queue.pop_front().unwrap();
+
+            visited.insert(pos);
+
+            self.state[pos.0][pos.1].update_state(CellState::Visible);
+
+            for neighbor_coords in self.neighbors(pos.0, pos.1) {
+                let (row, col): (usize, usize) = neighbor_coords;
+
+                if !visited.contains(&neighbor_coords) {
+                    match self.state[row][col].cell_type {
+                        CellType::Empty => queue.push_back(neighbor_coords),
+                        CellType::Number(_) => {
+                            self.state[row][col].update_state(CellState::Visible);
+                        }
+                        CellType::Mine => {
+                            panic!("This should not be possible");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn update(&mut self, mouse_pos: (f32, f32)) {
         let col = (mouse_pos.0 / (self.tile_width + self.gap)).floor() as usize;
         let row = (mouse_pos.1 / (self.tile_width + self.gap)).floor() as usize;
-        // println!("{}", self.on_gap(col, row, mouse_pos))
+
         if !self.on_gap(col, row, mouse_pos) {
             if let Some(clicked_cell) = self.state[row].get_mut(col) {
                 match clicked_cell.cell_state {
                     CellState::Hidden => {
                         clicked_cell.update_state(CellState::Visible);
+                        match clicked_cell.cell_type {
+                            CellType::Empty => {
+                                // If empty reveal all empty nearby
+                                self.reveal_empty(row, col);
+                            }
+                            CellType::Mine => {}
+                            CellType::Number(_) => {}
+                        }
                     }
                     CellState::Visible => {}
                 }
