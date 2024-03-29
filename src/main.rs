@@ -9,8 +9,8 @@ use rand::seq::index;
 fn window_conf() -> Conf {
     Conf {
         window_title: "Minesweeper".to_owned(),
-        window_width: 500,
-        window_height: 500,
+        window_width: 800,
+        window_height: 800,
         ..Default::default()
     }
 }
@@ -208,6 +208,14 @@ impl Board {
         }
     }
 
+    fn reveal_all(&mut self) {
+        for row in 0..self.y_cells {
+            for col in 0..self.x_cells {
+                self.state[row][col].update_state(CellState::Visible);
+            }
+        }
+    }
+
     pub fn update(&mut self, mouse_pos: (f32, f32)) {
         let col = (mouse_pos.0 / (self.tile_width + self.gap)).floor() as usize;
         let row = (mouse_pos.1 / (self.tile_width + self.gap)).floor() as usize;
@@ -222,7 +230,9 @@ impl Board {
                                 // If empty reveal all empty nearby
                                 self.reveal_empty(row, col);
                             }
-                            CellType::Mine => {}
+                            CellType::Mine => {
+                                self.reveal_all();
+                            }
                             CellType::Number(_) => {}
                         }
                     }
