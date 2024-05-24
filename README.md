@@ -1,2 +1,2 @@
 # Minesweeper
-Minesweeper game using Rust
+Minesweeper game coded in Rust
